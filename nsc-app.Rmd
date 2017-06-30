@@ -1,0 +1,182 @@
+---
+title: "StudentTracker File Formatter"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+
+# Code license: [MIT](https://www.r-project.org/Licenses/MIT
+
+library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(stringr)
+library(lubridate)
+
+```
+
+Column {data-width=300, .sidebar}
+-----------------------------------------------------------------------
+### Upload & Enter Data
+
+```{r}
+ 
+  
+
+ fileInput('file1', 'Choose CSV File',
+                accept=c('text/csv', 
+                         'text/comma-separated-values,text/plain', 
+                         '.csv'))
+       radioButtons('sep', 'Separator',
+                   c(Comma=',',
+                      Semicolon=';',
+                      Tab='\t'),
+                    ',')
+       radioButtons('quote', 'Quote',
+                    c(None='',
+                      'Double Quote'='"',
+                      'Single Quote'="'"),
+                    '"')
+
+      textInput("institution_code", label = "Institution Code")
+      textInput("branch_code", label = "Branch Code")
+      textInput("institution_name", label = "Institution Name")
+      textInput("inquiry_type", label = "Inquiry Type")
+      downloadButton('downloadData', label = 'Download')
+      
+
+       downloadHandler(
+      filename = function() { paste(input$institution_name, today(), '.txt', sep='') },
+      content = function(file) {
+        write.table(data(), file, col.names = FALSE, quote = FALSE, row.names = FALSE, sep =  "\t")
+      }
+    )
+
+
+date_today <- today()
+
+date_today <- paste0(year(date_today),
+                     str_pad(month(date_today), 2, pad = "0"),
+                     str_pad(day(date_today), 2, pad = "0"))
+  
+       data <- reactive({
+      
+      
+      record_type <- input$record_type # creates record type
+      institution_code <- input$institution_code # creates school code
+      branch_code <- input$branch_code # creates branch code
+      institution_name <- input$institution_name # creates school name
+      date_create <- input$date_create # creates date create
+      inquiry_type <- input$inquiry_type # creates search type)
+
+      
+      
+      
+      
+      inFile <- input$file1
+      
+      if (is.null(inFile))
+        return(NULL)
+      
+      df  <- read.csv(inFile$datapath, sep=input$sep, 
+                      quote=input$quote) %>% 
+        mutate(record_type = "D1",
+               dob = mdy(dob),
+               dob = paste0(year(dob),
+                            str_pad(month(dob), 2, pad = "0"),
+                            str_pad(day(dob), 2, pad = "0")),
+               search_date = mdy(search_date),
+               search_date = paste0(year(search_date),
+                            str_pad(month(search_date), 2, pad = "0"),
+                            str_pad(day(search_date), 2, pad = "0")),
+               middle = str_sub(middle, start = 1, end = 1),
+               record_type = record_type,
+               ssn         = "",
+               blank_1     = " ",
+               institution_code = institution_code,
+               branch_code = branch_code,
+               search_date  = as.character(search_date),
+               id          = as.character(id))
+      
+      df[is.na(df)] <- ""
+      
+ header <- tibble(record_type = "H1",
+                       ssn = institution_code,
+                       first = branch_code,
+                       middle = institution_name,
+                       last = date_today,
+                       suffix = inquiry_type,
+                       dob = "I",
+                       search_date = "",
+                       blank_1 = " ",
+                       branch_code = "",
+                       id = "",
+                       institution_code = "")
+      
+      df <- bind_rows(header, df)
+      
+      
+      trailer <- tibble(ssn = nrow(df) + 1,
+                        record_type = "T1") %>%
+        mutate(ssn = as.character(ssn),
+               first = "",
+               middle = "",
+               last = "",
+               suffix = "",
+               dob = "",
+               search_date = "",
+               blank_1 = " ",
+               branch_code = "",
+               id = "",
+               institution_code = "")
+      
+      df <- bind_rows(df, trailer)  %>%
+        select(record_type, ssn, first, middle, last,  suffix, 
+               dob, search_date, blank_1, institution_code, branch_code, id)
+      })
+
+
+```
+
+
+
+
+Column {data-width=700}
+-----------------------------------------------------------------------
+
+
+
+### Instructions & Download
+
+The purpose of this app is to remove the tedium of preparing files to submit to National Student Clearinghouse's StudentTracker service. 
+
+To begin, create a CSV file that includes the following variables with the column names *exactly* (case sensitive) as they appear in bold below. (They don't have to be in the same order, but the columns below must be included.)
+
+ - **first**: student's first name
+ - **middle**: student's middle name or initial
+ - **last**: student's last name
+ - **suffix**: suffix to student's name (e.g., Jr., III)
+ - **dob**: student's date of birth (mm/dd/yyyy)
+ - **id**: an id code so you can link the return data back to your own data sources
+ - **search_date**: search begin date (mm/dd/yyyy)
+ 
+Next, fill in the boxes to the left according to the instructions desribed [on the Student Clearinghouses's website](http://www.studentclearinghouse.org/colleges/files/ST_ExcelInstructions.pdf). Lastly, click the `Download` button and you will have a file fully formatted to submit to the StudentTracker service.
+
+For any questions, please contact [Arie Spirgel](mailto:spirgel@gmail.com)
+ 
+
+<span style="color:grey">Code license: [MIT](https://www.r-project.org/Licenses/MIT)</span>
+
+### Your Data Will Appear Here
+```{r}
+
+renderTable(data())
+
+```
+
+
